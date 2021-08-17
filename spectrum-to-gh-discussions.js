@@ -5,17 +5,17 @@ const ghAPI = require('./graphql-client');
 // Map Spectrum usernames to Personal Access Tokens of corresponding Github-Accounts
 // Tokens can be generated at https://github.com/settings/tokens and should have options 'public_repo' and 'write:discussion' enabled
 const githubUsers = {
-  'maximilian-koegel': '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',
-  'jhelming': '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',
-  'eneufeld': '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',
-  'camille-letavernier': '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',
-  'tortmayr': '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',
-  'planger': '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',
-  'martin-fleck': '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',
+  'maximilian-koegel': '',
+  'jhelming': '',
+  'eneufeld': '',
+  'camille-letavernier': '',
+  'tortmayr': '',
+  'planger': '',
+  'martin-fleck': '',
 }
 
 // All threads written not by tokens defined in githubUsers will be posted under this account.
-const defaultAccessToken = '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'
+const defaultAccessToken = ''
 
 function fetchSpectrumAPI(data) {
   var postData = JSON.stringify(data);
@@ -298,16 +298,30 @@ async function fetchSpectrumMessages(threadId, includeFirst = false) {
     // Save fetched threads into a backup file (useful for later verification):
     fs.writeFileSync('./spectrum-threads.json', JSON.stringify(threads, null, 2), 'utf-8');
 
-    // // After spectrum threads have been fetched and saved to file, threads can be read frome here
+    // After spectrum threads have been fetched and saved to file, or previous posts were unsuccessful, remaining threads can be read frome here
     // const threads = JSON.parse(fs.readFileSync('./spectrum-threads.json', 'utf-8'));
 
-    for (const thread of threads) {
-      await ghAPI.postDiscussion(thread);
+    while (threads.length) {
+      let thread = threads.shift()
+      let { status, message } = await ghAPI.postDiscussion(thread);
+      
+      console.log(message)
+      
+      if (!status) {
+        threads.unshift(thread);
+        console.log(`Failed to create discussion '${thread[0].title}'
+Restore remaining threads from file: './spectrum-threads.json' -> Uncomment line 302, Comment out 295-300`);
+        fs.writeFileSync('./spectrum-threads.json', JSON.stringify(threads, null, 2), 'utf-8');
+        break;
+      }
     }
 
     // Delete all discussions
-    // const nodes = await ghAPI.getAllDiscussionIds();
+    // const nodes = await ghAPI.getAllDiscussionIds(defaultAccessToken);
+    // if (!nodes)
+    //   return console.log('Unable to run query');
     // for (const node of nodes) {
+    //   await new Promise(resolve => setTimeout(resolve, 500));
     //   ghAPI.deleteDiscussion(node.node.id, defaultAccessToken);
     // }
 
